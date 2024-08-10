@@ -21,7 +21,7 @@ impl LogEntry {
     }
 
     pub fn decode_from_bytes(&mut self) -> Vec<u8> {
-        
+
     }
 }
 
@@ -38,7 +38,7 @@ impl Log {
         total_vec
     }
 
-    pub fn decode_from_byted(&mut self) -> [u8] {
+    pub fn decode_from_bytes(&mut self) -> [u8] {
 
     }
 }
