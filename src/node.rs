@@ -40,3 +40,15 @@ pub struct RaftNode {
     pub commit_index: i64,
     pub last_applied: i64
 }
+
+
+impl RaftNode {
+    pub fn append_entries() {
+
+    }
+
+    pub fn request_vote() {
+
+    }
+
+}

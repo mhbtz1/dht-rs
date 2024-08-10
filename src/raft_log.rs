@@ -21,7 +21,7 @@ impl LogEntry {
     }
 
     pub fn decode_from_bytes(&mut self) -> Vec<u8> {
-
+        todo!("Need to write decode logic");
     }
 }
 
