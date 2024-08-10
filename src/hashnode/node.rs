@@ -1,10 +1,13 @@
+use futures::prelude::*;
+use tarpc::{
+    client, context,
+    server::{self, Channel},
+};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, mpsc::{Sender, Receiver} };
 
 type FunctionCall = Box<dyn FnOnce() + Send + 'static>;
-enum RpcCall {
 
-}
 pub struct RaftCluster<K, V> {
     pub cluster_mutex: Arc<Mutex<usize>>,
     pub raft_nodes: Vec<RaftNode<K, V>>
@@ -14,8 +17,8 @@ pub struct RaftCluster<K, V> {
 pub struct RaftNode<K, V> {
     node_mutex: Arc<Mutex<usize>>,
     //senders to all other local raft nodes
-    senders: HashMap<usize, Sender<FunctionCall> >,
-    receivers: HashMap<usize, Receiver<FunctionCall> >,
+    senders: HashMap<usize, Sender<()> >,
+    receivers: HashMap<usize, Receiver<()> >,
 
     store: HashMap<K, V>,
     log: Vec<V>,
@@ -33,7 +36,7 @@ pub struct RaftNode<K, V> {
 }
 
 impl<K, V> RaftNode<K, V> {
-    pub fn new(senders: HashMap<usize, Sender<FunctionCall>>, receivers: HashMap<usize, Receiver<FunctionCall>>) -> Self {
+    pub fn new(senders: HashMap<usize, Sender<()>>, receivers: HashMap<usize, Receiver<()>>) -> Self {
         RaftNode { 
             node_mutex: Arc::new(Mutex::new(0)),
             senders,
@@ -55,9 +58,7 @@ impl<K, V> RaftNode<K, V> {
     }
 
     pub fn request_vote(&mut self) {
-        for (i, sender) in self.senders.into_iter().enumerate() {
-        
-        }
+    
     }
 }
 
