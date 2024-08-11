@@ -10,10 +10,9 @@ use std::time::{Duration, Instant};
 
 const LOG_ENTRY_BYTE_LIMIT: usize = 512;
 
-
 pub struct PageCache {
     pub backing_file: std::fs::File, //implements std::io::Read and std::io::Write, so I have disk write/read access through this
-    
+
     pub page_cache: std::collections::HashMap<u64, [u8; LOG_ENTRY_BYTE_LIMIT]>,
     //pub dirty_pages: std::collections::HashSet<u64>,
     page_cache_size: usize,
@@ -25,23 +24,22 @@ pub struct PageCache {
 }
 
 impl PageCache {
-    fn new(file: std::fs::File, page_cache_size: usize) -> PageCache{
+    fn new(file: std::fs::File, page_cache_size: usize) -> PageCache {
         let page_cache = std::collections::HashMap::new();
-    
+
         PageCache {
             backing_file: file,
             page_cache,
             page_cache_size,
-            buffer: vec![], 
+            buffer: vec![],
             buffer_start_address: None,
-            buffer_offset: 0
+            buffer_offset: 0,
         }
     }
 
-
     fn update_cache(&mut self, offset: u64, page: [u8; LOG_ENTRY_BYTE_LIMIT as usize]) {
         if self.page_cache_size == 0 {
-            return 
+            return;
         }
         if let Some(cur_page) = self.page_cache.get(&offset) {
             if page != *cur_page {
@@ -54,18 +52,21 @@ impl PageCache {
         }
     }
 
-    fn read(&mut self, offset: u64, buf: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize]){
-        // read the contents of the page cache into buf if present, otherwise query the disk and 
+    fn read(&mut self, offset: u64, buf: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize]) {
+        // read the contents of the page cache into buf if present, otherwise query the disk and
         if let Some(prev_page) = self.page_cache.get(&offset) {
             buf.copy_from_slice(prev_page);
             return;
         } else {
-            self.backing_file.read_exact_at(&mut buf[0..], offset).unwrap();
+            self.backing_file
+                .read_exact_at(&mut buf[0..], offset)
+                .unwrap();
             self.page_cache.insert(offset, *buf);
         }
     }
 
     fn write(&mut self, offset: u64, page: [u8; LOG_ENTRY_BYTE_LIMIT as usize]) {
+        //writing page into the page cache's current buffer and update the internal mapping.
         if self.buffer_start_address.is_none() {
             self.buffer_start_address = Some(offset);
             self.buffer_offset = 0;
@@ -81,16 +82,15 @@ impl PageCache {
         self.buffer.extend(page);
         self.update_cache(offset, page);
     }
-    
-    
+
     fn sync(&mut self) {
         //synchronize the page cache with the disk
-        self.backing_file.write_all_at(&self.buffer, self.buffer_start_address.unwrap());
+        self.backing_file
+            .write_all_at(&self.buffer, self.buffer_start_address.unwrap());
         self.buffer.clear();
         self.buffer_start_address = None;
         self.backing_file.sync_all();
     }
-
 }
 
 struct PageCacheIO<'a> {
@@ -113,7 +113,7 @@ impl<'this> Write for PageCacheIO<'this> {
         assert_eq!(buf.len(), LOG_ENTRY_BYTE_LIMIT as usize);
         let fixed_buf = <&[u8; LOG_ENTRY_BYTE_LIMIT as usize]>::try_from(buf).unwrap();
         self.pagecache.write(self.offset, *fixed_buf);
-        self.offset += LOG_ENTRY_BYTE_LIMIT;
+        self.offset += LOG_ENTRY_BYTE_LIMIT as u64;
         Ok(LOG_ENTRY_BYTE_LIMIT as usize)
     }
 
@@ -123,14 +123,12 @@ impl<'this> Write for PageCacheIO<'this> {
     }
 }
 
-
-
 #[derive(Debug, Clone)]
 pub struct LogEntry {
-    command: Vec<u8>,
-    index: u64,
-    term: u64,
-    client_id: u64
+    pub command: Vec<u8>,
+    pub index: u64,
+    pub term: u64,
+    pub client_id: u64,
 }
 
 impl LogEntry {
@@ -139,11 +137,11 @@ impl LogEntry {
     }
 
     // i.e. if we can fit our commands in a single page on disk
-    fn command_length(comm_len: usize) -> usize{
+    fn command_length(comm_len: usize) -> usize {
         if (comm_len > LOG_ENTRY_BYTE_LIMIT - 53) {
             return LOG_ENTRY_BYTE_LIMIT - 53;
-        } 
-        comm_len 
+        }
+        comm_len
     }
 
     fn store_log_metadata(&self, buffer: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize]) -> usize {
@@ -164,7 +162,11 @@ impl LogEntry {
         command_length - command_first_page
     }
 
-    fn store_overflow(&self, buffer: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize], offset: usize) -> usize {
+    fn store_overflow(
+        &self,
+        buffer: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize],
+        offset: usize,
+    ) -> usize {
         let to_write = self.command.len() - offset;
         let filled = if to_write > LOG_ENTRY_BYTE_LIMIT as usize - 1 {
             // -1 for the overflow marker.
@@ -177,8 +179,11 @@ impl LogEntry {
         filled
     }
 
-
-    fn encode(&self, buffer: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize], mut writer: impl std::io::Write) -> u64 {
+    pub fn encode(
+        &self,
+        buffer: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize],
+        mut writer: impl std::io::Write,
+    ) -> u64 {
         let to_write = self.store_log_metadata(buffer);
         writer.write_all(buffer).unwrap();
         let mut pages = 1;
@@ -242,7 +247,6 @@ impl LogEntry {
         fill
     }
 
-
     fn decode(mut reader: impl std::io::Read) -> LogEntry {
         let mut page = [0; LOG_ENTRY_BYTE_LIMIT as usize];
         // Since entries are always encoded into complete PAGESIZE
@@ -252,8 +256,6 @@ impl LogEntry {
         reader.read_exact(&mut page).unwrap();
 
         let (mut entry, stored_checksum, command_read) = LogEntry::recover_metadata(&page);
-        let mut actual_checksum = CRC32C::new();
-        actual_checksum.update(&page[5..61]);
 
         let mut read = command_read;
         while read < entry.command.len() {
@@ -262,15 +264,16 @@ impl LogEntry {
             read += filled;
         }
 
-        actual_checksum.update(&entry.command);
-        assert_eq!(stored_checksum, actual_checksum.sum());
         entry
     }
 
     fn decode_from_pagecache(page_cache: &mut PageCache, offset: u64) -> (LogEntry, u64) {
-        let mut reader = PageCacheIO { disk_offset: offset as usize, page_cache };
+        let mut reader = PageCacheIO {
+            offset,
+            pagecache: page_cache,
+        };
         let entry = LogEntry::decode(&mut reader);
-        let offset = reader.disk_offset;
+        let offset = reader.offset;
 
         (entry, offset)
     }
