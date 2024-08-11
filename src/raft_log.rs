@@ -22,37 +22,34 @@ pub struct PageCache {
     buffer_offset: Option<u64>,
 }
 
-pub struct PageCacheIO<'a> {
-    disk_offset: usize,
-    page_cache: &'a mut PageCache
+struct PageCacheIO<'a> {
+    offset: u64,
+    pagecache: &'a mut PageCache,
 }
 
-impl PageCache {
-    fn new() -> PageCache {
-        let mut page_cache = std::collections::HashMap::new();
-        let nfile = std::fs::File::create(format!("{}.cache", Uuid::new_v4())).unwrap();
-        
-        PageCache {
-            backing_file: nfile,
-            page_cache,
-            page_cache_size: 0,
-            buffer: vec![],
-            buffer_start_address: None,
-            buffer_offset: None
-        }
+impl<'a> Read for &mut PageCacheIO<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        assert_eq!(buf.len(), LOG_ENTRY_BYTE_LIMIT as usize);
+        let fixed_buf = <&mut [u8; LOG_ENTRY_BYTE_LIMIT as usize]>::try_from(buf).unwrap();
+        self.pagecache.read(self.offset, fixed_buf);
+        self.offset += LOG_ENTRY_BYTE_LIMIT as u64;
+        Ok(LOG_ENTRY_BYTE_LIMIT as usize)
+    }
+}
+
+impl<'this> Write for PageCacheIO<'this> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        assert_eq!(buf.len(), PAGESIZE as usize);
+        let fixed_buf = <&[u8; PAGESIZE as usize]>::try_from(buf).unwrap();
+        self.pagecache.write(self.offset, *fixed_buf);
+        self.offset += PAGESIZE;
+        Ok(PAGESIZE as usize)
     }
 
-    fn write(&self) {
-
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.pagecache.sync();
+        Ok(())
     }
-
-    fn read(&self) {
-
-    }
-
-    fn sync(&mut self) {
-
-    } 
 }
 
 
@@ -199,8 +196,8 @@ impl LogEntry {
         entry
     }
 
-    fn decode_from_pagecache(pagecache: &mut PageCache, offset: u64) -> (LogEntry, u64) {
-        let mut reader = PageCacheIO { offset, pagecache };
+    fn decode_from_pagecache(page_cache: &mut PageCache, offset: u64) -> (LogEntry, u64) {
+        let mut reader = PageCacheIO { disk_offset: offset as usize, page_cache };
         let entry = LogEntry::decode(&mut reader);
         let offset = reader.disk_offset;
 
@@ -212,4 +209,4 @@ impl LogEntry {
     }
 }
 
-type Log = Vec<LogEntry>;
+pub type Log = Vec<LogEntry>;
