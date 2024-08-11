@@ -12,14 +12,85 @@ const LOG_ENTRY_BYTE_LIMIT: usize = 512;
 
 
 pub struct PageCache {
-    pub backing_file: std::fs::File,
+    pub backing_file: std::fs::File, //implements std::io::Read and std::io::Write, so I have disk write/read access through this
     
-    page_cache: std::collections::HashMap<u64, [u8; LOG_ENTRY_BYTE_LIMIT]>
+    pub page_cache: std::collections::HashMap<u64, [u8; LOG_ENTRY_BYTE_LIMIT]>,
+    //pub dirty_pages: std::collections::HashSet<u64>,
     page_cache_size: usize,
 
+    // doing buffered I/O to disk for pages / log entries
     buffer: Vec<u8>,
     buffer_start_address: Option<u64>,
-    buffer_offset: Option<u64>,
+    buffer_offset: u64,
+}
+
+impl PageCache {
+    fn new(file: std::fs::File, page_cache_size: usize) -> PageCache{
+        let page_cache = std::collections::HashMap::new();
+    
+        PageCache {
+            backing_file: file,
+            page_cache,
+            page_cache_size,
+            buffer: vec![], 
+            buffer_start_address: None,
+            buffer_offset: 0
+        }
+    }
+
+
+    fn update_cache(&mut self, offset: u64, page: [u8; LOG_ENTRY_BYTE_LIMIT as usize]) {
+        if self.page_cache_size == 0 {
+            return 
+        }
+        if let Some(cur_page) = self.page_cache.get(&offset) {
+            if page != *cur_page {
+                self.page_cache.insert(offset, page);
+                //self.dirty_pages.insert(offset);
+            }
+            return;
+        } else {
+            self.page_cache.insert(offset, page);
+        }
+    }
+
+    fn read(&mut self, offset: u64, buf: &mut [u8; LOG_ENTRY_BYTE_LIMIT as usize]){
+        // read the contents of the page cache into buf if present, otherwise query the disk and 
+        if let Some(prev_page) = self.page_cache.get(&offset) {
+            buf.copy_from_slice(prev_page);
+            return;
+        } else {
+            self.backing_file.read_exact_at(&mut buf[0..], offset).unwrap();
+            self.page_cache.insert(offset, *buf);
+        }
+    }
+
+    fn write(&mut self, offset: u64, page: [u8; LOG_ENTRY_BYTE_LIMIT as usize]) {
+        if self.buffer_start_address.is_none() {
+            self.buffer_start_address = Some(offset);
+            self.buffer_offset = 0;
+        } else {
+            // Make sure we're always doing sequential writes in
+            // between self.flush() call.
+            assert_eq!(self.buffer_offset, offset - LOG_ENTRY_BYTE_LIMIT as u64);
+            self.buffer_offset = offset;
+        }
+
+        assert_ne!(self.buffer_start_address, None);
+
+        self.buffer.extend(page);
+        self.update_cache(offset, page);
+    }
+    
+    
+    fn sync(&mut self) {
+        //synchronize the page cache with the disk
+        self.backing_file.write_all_at(&self.buffer, self.buffer_start_address.unwrap());
+        self.buffer.clear();
+        self.buffer_start_address = None;
+        self.backing_file.sync_all();
+    }
+
 }
 
 struct PageCacheIO<'a> {
@@ -39,11 +110,11 @@ impl<'a> Read for &mut PageCacheIO<'a> {
 
 impl<'this> Write for PageCacheIO<'this> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        assert_eq!(buf.len(), PAGESIZE as usize);
-        let fixed_buf = <&[u8; PAGESIZE as usize]>::try_from(buf).unwrap();
+        assert_eq!(buf.len(), LOG_ENTRY_BYTE_LIMIT as usize);
+        let fixed_buf = <&[u8; LOG_ENTRY_BYTE_LIMIT as usize]>::try_from(buf).unwrap();
         self.pagecache.write(self.offset, *fixed_buf);
-        self.offset += PAGESIZE;
-        Ok(PAGESIZE as usize)
+        self.offset += LOG_ENTRY_BYTE_LIMIT;
+        Ok(LOG_ENTRY_BYTE_LIMIT as usize)
     }
 
     fn flush(&mut self) -> std::io::Result<()> {
