@@ -1,10 +1,10 @@
 mod node;
-mod rpc;
 mod raft_log;
+mod rpc;
 
-use node::{RaftNode, RaftCluster};
-use rpc::{RequestVoteReq, RequestVoteReply, AppendEntriesReq, AppendEntriesReply};
+use node::{RaftCluster, RaftNode};
 use raft_log::{Log, LogEntry};
+use rpc::{AppendEntriesReply, AppendEntriesReq, RequestVoteReply, RequestVoteReq};
 
 fn main() {
     println!("Hello, world!");
