@@ -153,3 +153,8 @@ impl AppendEntriesReq {
         Ok(())
     }
 }
+
+// should test the page cache's functionality
+mod test {
+
+}
