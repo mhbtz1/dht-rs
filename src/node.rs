@@ -25,10 +25,10 @@ pub struct RaftCluster {
 
 #[derive(Debug)]
 pub struct RaftNode {
-    pub node_mutex: Arc<Mutex<usize>>,
+    pub node_mutex: Mutex<usize>,
     //senders to all other local raft nodes
-    pub senders: HashMap<usize, Sender<()>>,
-    pub receivers: HashMap<usize, Receiver<()>>,
+    pub senders: HashMap<usize, Sender<()> >,
+    pub receivers: HashMap<usize, Sender<()> >,
 
     pub store: HashMap<i64, i64>,
     pub log: Vec<LogObject>,
@@ -44,7 +44,13 @@ pub struct RaftNode {
 }
 
 impl RaftNode {
-    pub fn append_entries() {}
 
-    pub fn request_vote() {}
+    pub fn new() -> RaftNode {
+        RaftNode {
+            node_mutex: Mutex::new(0),
+
+        }
+    }
+
+    pub fn 
 }

@@ -8,4 +8,5 @@ use rpc::{AppendEntriesReply, AppendEntriesReq, RequestVoteReply, RequestVoteReq
 
 fn main() {
     println!("Hello, world!");
+
 }
