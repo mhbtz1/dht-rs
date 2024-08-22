@@ -153,7 +153,7 @@ impl LogEntry {
         buffer[13..21].copy_from_slice(&self.index.to_le_bytes());
         buffer[37..45].copy_from_slice(&self.client_id.to_le_bytes());
         buffer[45..53].copy_from_slice(&command_length.to_le_bytes());
-
+        
         let checksum = crc32c::crc32c(&buffer[5..53]);
         buffer[1..5].copy_from_slice(&checksum.to_le_bytes());
 
