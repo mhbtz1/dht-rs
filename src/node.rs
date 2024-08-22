@@ -4,6 +4,9 @@ use std::sync::{
     mpsc::{Receiver, Sender},
     Arc, Mutex,
 };
+
+use crate::rpc::R
+
 use tarpc::{
     client, context,
     server::{self, Channel},
@@ -52,5 +55,5 @@ impl RaftNode {
         }
     }
 
-    pub fn 
+    pub fn append_entries(request: ) 
 }

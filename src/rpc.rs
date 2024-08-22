@@ -45,7 +45,7 @@ Disk format for RPC calls
 5. Any data specific to the RPC (AppendEntries vs RequestVote) (n bytes)
 */
 
-struct RPCMessageEncoder<T: std::io::Write> {
+pub struct RPCMessageEncoder<T: std::io::Write> {
     request_id: Uuid,
     sender_id: u64,
     writer: BufWriter<T>,
@@ -109,7 +109,7 @@ impl RequestVoteReq {
     }
 
     fn decode<T: std::io::Read>(
-        mut buf_reader: BufReader<T>,
+        mut buf_reader: BufReader<T>, //reader object to read a request from some other RPC 
         metadata: [u8; 33],
         request_id: u64,
         term: u64,
