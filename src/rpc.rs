@@ -109,23 +109,26 @@ impl RequestVoteReq {
     }
 
     fn decode<T: std::io::Read>(
-        mut buf_reader: BufReader<T>, //reader object to read a request from some other RPC 
+        mut buf_reader: BufReader<T>, //reader object to read a request from some other RPC
         metadata: [u8; 33],
-        request_id: u64,
+        request_id: Uuid,
         term: u64,
     ) -> std::result::Result<RequestVoteReq, String> {
-        let mut buf: [u8; 64] = [0; 64];
+        // Wire layout: metadata(33) + candidate_id(8) + last_log_index(8)
+        // + last_log_term(8) + checksum(4) = 61 bytes.
+        let mut buf: [u8; 61] = [0; 61];
         buf[0..metadata.len()].copy_from_slice(&metadata);
         //read_exact will mutate the buffer and append the other RPC specific information into it.
-        let content = buf_reader.read_exact(&mut buf[metadata.len()..]).unwrap();
-        let checksum = u32::from_le_bytes(buf[32..36].try_into().unwrap());
-        if checksum != crc32c::crc32c(&buf[0..36]) {
+        buf_reader.read_exact(&mut buf[metadata.len()..]).unwrap();
+
+        let checksum = u32::from_le_bytes(buf[57..61].try_into().unwrap());
+        if checksum != crc32c::crc32c(&buf[0..57]) {
             return Err("Error!".to_string());
         }
 
-        let candidate_id = u64::from_le_bytes(buf[33..49].try_into().unwrap());
-        let last_log_index = u64::from_le_bytes(buf[49..57].try_into().unwrap());
-        let last_log_term = u64::from_le_bytes(buf[57..64].try_into().unwrap());
+        let candidate_id = u64::from_le_bytes(buf[33..41].try_into().unwrap());
+        let last_log_index = u64::from_le_bytes(buf[41..49].try_into().unwrap());
+        let last_log_term = u64::from_le_bytes(buf[49..57].try_into().unwrap());
 
         Ok(RequestVoteReq {
             term,

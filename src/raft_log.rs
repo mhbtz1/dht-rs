@@ -204,8 +204,8 @@ impl LogEntry {
         assert_eq!(page[0], 1); // Start of entry marker.
         let term = u64::from_le_bytes(page[5..13].try_into().unwrap());
         let index = u64::from_le_bytes(page[13..21].try_into().unwrap());
-        let client_id = u64::from_le_bytes(page[37..53].try_into().unwrap());
-        let command_length = u64::from_le_bytes(page[53..61].try_into().unwrap()) as usize;
+        let client_id = u64::from_le_bytes(page[37..45].try_into().unwrap());
+        let command_length = u64::from_le_bytes(page[45..53].try_into().unwrap()) as usize;
         let stored_checksum = u32::from_le_bytes(page[1..5].try_into().unwrap());
 
         // recover_metadata() will only decode the first page's worth of
@@ -213,7 +213,7 @@ impl LogEntry {
         // additional pages.
         let command_first_page = LogEntry::command_length(command_length);
         let mut command = vec![0; command_length];
-        command[0..command_first_page].copy_from_slice(&page[61..61 + command_first_page]);
+        command[0..command_first_page].copy_from_slice(&page[53..53 + command_first_page]);
 
         (
             LogEntry {
