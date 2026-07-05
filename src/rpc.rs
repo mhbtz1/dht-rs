@@ -8,14 +8,14 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct RequestVoteReply {
-    term: u64,
-    vote_granted: bool,
+    pub term: u64,
+    pub vote_granted: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct AppendEntriesReply {
-    term: u64,
-    success: bool,
+    pub term: u64,
+    pub success: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -35,8 +35,8 @@ pub struct AppendEntriesReq {
     pub entries: crate::Log,
     pub leader_commit: u64,
 }
-// in order to simplify the application of RPC for this example, we will use the disk as a proxy for performing RPCs between Raft nodes
 /*
+in order to simplify the application of RPC for this example, we will use the disk as a proxy for performing RPCs between Raft nodes
 Disk format for RPC calls
 1. RequestID (8 bytes)
 2. SenderID (8 bytes)
