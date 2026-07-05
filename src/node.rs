@@ -5,7 +5,7 @@ use std::sync::{
     Arc, Mutex,
 };
 
-use crate::rpc::R
+use crate::rpc::{AppendEntriesReply, AppendEntriesReq};
 
 use tarpc::{
     client, context,
@@ -51,9 +51,43 @@ impl RaftNode {
     pub fn new() -> RaftNode {
         RaftNode {
             node_mutex: Mutex::new(0),
+            senders: HashMap::new(),
+            receivers: HashMap::new(),
 
+            store: HashMap::new(),
+            log: Vec::new(),
+
+            is_leader: false,
+            current_term: 0,
+            voted_for: -1, // -1 sentinel: hasn't voted for anyone this term.
+            next_index: Vec::new(),
+            match_index: Vec::new(),
+
+            commit_index: 0,
+            last_applied: 0,
         }
     }
 
-    pub fn append_entries(request: ) 
+    // Follower-side handler for the leader's AppendEntries RPC.
+    pub fn append_entries(&mut self, request: AppendEntriesReq) -> AppendEntriesReply {
+        if request.term < self.current_term as u64 {
+            return AppendEntriesReply {
+                term: self.current_term as u64,
+                success: false,
+            };
+        }
+
+        self.current_term = request.term as usize;
+        self.is_leader = false;
+        self.voted_for = -1;
+
+        if request.leader_commit as i64 > self.commit_index {
+            self.commit_index = request.leader_commit as i64;
+        }
+
+        AppendEntriesReply {
+            term: self.current_term as u64,
+            success: true,
+        }
+    }
 }
